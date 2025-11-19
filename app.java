@@ -1,6 +1,6 @@
 import java.util.*;
 import java.security.MessageDigest;
-import java.nio.charset.StandardCharset;
+import java.nio.charset.StandardCharsets;
 
 public class GraphicalAuthSystem {
 
