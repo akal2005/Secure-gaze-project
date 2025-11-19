@@ -1,174 +1,172 @@
-// Java-based backend (Spring Boot) for graphical password authentication
-
-// ------------------------------
-// User Entity Class
-// ------------------------------
-import jakarta.persistence.*;
-
-@Entity
-@Table(name = "users")
-public class User {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(unique = true, nullable = false)
-    private String username;
-
-    @Column(unique = true, nullable = false)
-    private String email;
-
-    private String fullName;
-    private String bio;
-    private String profilePic;
-
-    @Column(nullable = false)
-    private String graphicalPasswordHash;
-
-    // Getters and setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
-    public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
-
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-
-    public String getFullName() { return fullName; }
-    public void setFullName(String fullName) { this.fullName = fullName; }
-
-    public String getBio() { return bio; }
-    public void setBio(String bio) { this.bio = bio; }
-
-    public String getProfilePic() { return profilePic; }
-    public void setProfilePic(String profilePic) { this.profilePic = profilePic; }
-
-    public String getGraphicalPasswordHash() { return graphicalPasswordHash; }
-    public void setGraphicalPasswordHash(String graphicalPasswordHash) { this.graphicalPasswordHash = graphicalPasswordHash; }
-}
-
-// ------------------------------
-// User Repository
-// ------------------------------
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-import java.util.Optional;
-
-@Repository
-public interface UserRepository extends JpaRepository<User, Long> {
-    Optional<User> findByUsername(String username);
-}
-
-// ------------------------------
-// Graphical Password Utility
-// ------------------------------
 import java.util.*;
+import java.security.MessageDigest;
+import java.nio.charset.StandardCharset;
 
-public class GraphicalPasswordUtil {
-    public static final String[] CHARACTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split("");
+public class GraphicalAuthSystem {
 
-    public static final String[] COLORS = {
-        "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF",
-        "#FFA500", "#800080", "#008000", "#FFC0CB", "#A52A2A", "#FFD700",
-        "#FF4500", "#DA70D6", "#7FFF00", "#4682B4", "#FF69B4", "#9ACD32",
-        "#20B2AA", "#9932CC", "#FFDAB9", "#00CED1", "#FF6347", "#ADFF2F",
-        "#BA55D3", "#98FB98", "#F08080", "#7B68EE", "#FFE4B5", "#40E0D0",
-        "#C71585", "#66CDAA", "#FFDEAD", "#00FA9A", "#DC143C", "#F0E68C",
-        "#6495ED", "#FFF0F5", "#228B22", "#DAA520", "#6A5ACD", "#F5DEB3",
-        "#4169E1", "#FA8072", "#2E8B57", "#EEE8AA", "#B22222", "#87CEEB",
-        "#9400D3", "#F4A460", "#6B8E23", "#FFB6C1", "#483D8B", "#FF8C00",
-        "#90EE90", "#BC8F8F", "#8B008B", "#556B2F", "#FFEBCD", "#1E90FF",
-        "#FFFACD", "#D2691E"
-    };
+    // ------------------------------------------------------------
+    // USER MODEL 
+    // ------------------------------------------------------------
+    static class User {
+        private Long id;
+        private String username;
+        private String email;
+        private String fullName;
+        private String bio;
+        private String profilePic;
+        private String graphicalPasswordHash;
 
-    public static Map<String, Character> getColorToChar() {
-        Map<String, Character> map = new HashMap<>();
-        for (int i = 0; i < CHARACTERS.length; i++) {
-            map.put(COLORS[i], CHARACTERS[i].charAt(0));
+        public User(Long id, String username, String email, String fullName, String hash) {
+            this.id = id;
+            this.username = username;
+            this.email = email;
+            this.fullName = fullName;
+            this.graphicalPasswordHash = hash;
         }
-        return map;
-    }
-}
 
-// ------------------------------
-// Authentication Controller
-// ------------------------------
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.type.TypeReference;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-
-import jakarta.servlet.http.HttpSession;
-import java.util.*;
-
-@Controller
-public class AuthController {
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @PostMapping("/register")
-    public String register(@RequestParam String username,
-                           @RequestParam String email,
-                           @RequestParam String fullName,
-                           @RequestParam String graphicalPasswordJson,
-                           RedirectAttributes redirectAttrs) {
-        try {
-            String decodedPassword = decodeGraphicalPassword(graphicalPasswordJson);
-            String hashedPassword = new BCryptPasswordEncoder().encode(decodedPassword);
-
-            User user = new User();
-            user.setUsername(username);
-            user.setEmail(email);
-            user.setFullName(fullName);
-            user.setGraphicalPasswordHash(hashedPassword);
-
-            userRepository.save(user);
-            redirectAttrs.addFlashAttribute("success", "Registration successful!");
-        } catch (Exception e) {
-            redirectAttrs.addFlashAttribute("error", "Error: " + e.getMessage());
-        }
-        return "redirect:/login";
+        public Long getId() { return id; }
+        public String getUsername() { return username; }
+        public String getEmail() { return email; }
+        public String getFullName() { return fullName; }
+        public String getGraphicalPasswordHash() { return graphicalPasswordHash; }
     }
 
-    @PostMapping("/login")
-    public String login(@RequestParam String username,
-                        @RequestParam String graphicalPasswordJson,
-                        HttpSession session,
-                        RedirectAttributes redirectAttrs) {
-        Optional<User> optionalUser = userRepository.findByUsername(username);
-        if (optionalUser.isEmpty()) {
-            redirectAttrs.addFlashAttribute("error", "Invalid username");
-            return "redirect:/login";
+    // ------------------------------------------------------------
+    // IN-MEMORY "DATABASE"
+    // ------------------------------------------------------------
+    static class UserDatabase {
+        private Map<String, User> users = new HashMap<>();
+        private Long counter = 1L;
+
+        public void save(User user) {
+            users.put(user.getUsername(), user);
         }
 
-        User user = optionalUser.get();
-        String decodedPassword = decodeGraphicalPassword(graphicalPasswordJson);
+        public User findByUsername(String username) {
+            return users.get(username);
+        }
 
-        if (new BCryptPasswordEncoder().matches(decodedPassword, user.getGraphicalPasswordHash())) {
-            session.setAttribute("userId", user.getId());
-            return "redirect:/dashboard";
-        } else {
-            redirectAttrs.addFlashAttribute("error", "Invalid graphical password");
-            return "redirect:/login";
+        public Long nextId() {
+            return counter++;
         }
     }
 
-    private String decodeGraphicalPassword(String json) throws Exception {
-        ObjectMapper mapper = new ObjectMapper();
-        List<List<String>> pairs = mapper.readValue(json, new TypeReference<List<List<String>>>() {});
-        Map<String, Character> colorToChar = GraphicalPasswordUtil.getColorToChar();
+    // ------------------------------------------------------------
+    // GRAPHICAL PASSWORD UTILITY
+    // ------------------------------------------------------------
+    static class GraphicalPasswordUtil {
 
-        StringBuilder password = new StringBuilder();
-        for (List<String> pair : pairs) {
-            password.append(colorToChar.get(pair.get(0)));
-            password.append(colorToChar.get(pair.get(1)));
+        public static final String[] CHARACTERS =
+                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split("");
+
+        public static final String[] COLORS = {
+            "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF",
+            "#FFA500", "#800080", "#008000", "#FFC0CB", "#A52A2A", "#FFD700",
+            "#FF4500", "#DA70D6", "#7FFF00", "#4682B4", "#FF69B4", "#9ACD32",
+            "#20B2AA", "#9932CC", "#FFDAB9", "#00CED1", "#FF6347", "#ADFF2F",
+            "#BA55D3", "#98FB98", "#F08080", "#7B68EE", "#FFE4B5", "#40E0D0",
+            "#C71585", "#66CDAA", "#FFDEAD", "#00FA9A", "#DC143C", "#F0E68C",
+            "#6495ED", "#FFF0F5", "#228B22", "#DAA520", "#6A5ACD", "#F5DEB3",
+            "#4169E1", "#FA8072", "#2E8B57", "#EEE8AA", "#B22222", "#87CEEB",
+            "#9400D3", "#F4A460", "#6B8E23", "#FFB6C1", "#483D8B", "#FF8C00",
+            "#90EE90", "#BC8F8F", "#8B008B", "#556B2F", "#FFEBCD", "#1E90FF",
+            "#FFFACD", "#D2691E"
+        };
+
+        // Map color → character
+        public static Map<String, Character> getColorToCharacterMap() {
+            Map<String, Character> map = new HashMap<>();
+            for (int i = 0; i < CHARACTERS.length; i++) {
+                map.put(COLORS[i], CHARACTERS[i].charAt(0));
+            }
+            return map;
         }
-        return password.toString();
+
+        // Convert pairs of [color1, color2] to decrypted password
+        public static String decodeGraphicalPassword(List<List<String>> pairs) {
+            Map<String, Character> map = getColorToCharacterMap();
+            StringBuilder sb = new StringBuilder();
+
+            for (List<String> pair : pairs) {
+                sb.append(map.get(pair.get(0)));
+                sb.append(map.get(pair.get(1)));
+            }
+
+            return sb.toString();
+        }
+
+        // SHA-256 HASH FUNCTION
+        public static String hashPassword(String password) {
+            try {
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                byte[] hash = digest.digest(password.getBytes(StandardCharsets.UTF_8));
+                StringBuilder hex = new StringBuilder();
+                for (byte b : hash) {
+                    hex.append(String.format("%02x", b));
+                }
+                return hex.toString();
+            } catch (Exception e) {
+                throw new RuntimeException("Hashing error");
+            }
+        }
+    }
+
+    // ------------------------------------------------------------
+    // AUTHENTICATION SERVICE
+    // ------------------------------------------------------------
+    static class AuthService {
+        UserDatabase db;
+
+        public AuthService(UserDatabase db) {
+            this.db = db;
+        }
+
+        // REGISTER USER
+        public String register(String username, String email, String fullName, List<List<String>> passwordPairs) {
+
+            String decoded = GraphicalPasswordUtil.decodeGraphicalPassword(passwordPairs);
+            String hashed = GraphicalPasswordUtil.hashPassword(decoded);
+
+            User user = new User(db.nextId(), username, email, fullName, hashed);
+            db.save(user);
+
+            return "Registration successful!";
+        }
+
+        // LOGIN USER
+        public String login(String username, List<List<String>> passwordPairs) {
+
+            User user = db.findByUsername(username);
+            if (user == null) return "Error: User not found";
+
+            String decoded = GraphicalPasswordUtil.decodeGraphicalPassword(passwordPairs);
+            String hashed = GraphicalPasswordUtil.hashPassword(decoded);
+
+            if (hashed.equals(user.getGraphicalPasswordHash())) {
+                return "Login successful! Welcome, " + user.getFullName();
+            } else {
+                return "Error: Invalid graphical password";
+            }
+        }
+    }
+
+    // ------------------------------------------------------------
+    // MAIN METHOD TO RUN PROGRAM
+    // ------------------------------------------------------------
+    public static void main(String[] args) {
+
+        UserDatabase db = new UserDatabase();
+        AuthService auth = new AuthService(db);
+
+        // EXAMPLE: Graphical password input
+        List<List<String>> gp = new ArrayList<>();
+        gp.add(Arrays.asList("#FF0000", "#00FF00")); // red + green
+        gp.add(Arrays.asList("#0000FF", "#FFFF00")); // blue + yellow
+
+        // Registration
+        System.out.println(auth.register("john123", "john@gmail.com", "John Doe", gp));
+
+        // Login
+        System.out.println(auth.login("john123", gp));
     }
 }
