@@ -1,0 +1,41 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String         @id @default(uuid())
+  username      String         @unique
+  passwordHash  String         // Hashed combination
+  salt          String         // Salt for client-side encryption key derivation
+  createdAt     DateTime       @default(now())
+  vaultItems    VaultItem[]
+  loginAttempts LoginAttempt[]
+}
+
+model VaultItem {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String   // e.g., "Google"
+  username  String   // encrypted username
+  value     String   // encrypted password/secret
+  notes     String?  // encrypted notes
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model LoginAttempt {
+  id          String   @id @default(uuid())
+  username    String
+  ipAddress   String
+  success     Boolean
+  attemptTime DateTime @default(now())
+  details     String?
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

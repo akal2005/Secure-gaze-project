@@ -1,0 +1,178 @@
+.dialContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 20px 0;
+  user-select: none;
+}
+
+.dialWrapper {
+  position: relative;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #2d3238 0%, #15181b 100%);
+  box-shadow: 
+    0 10px 30px rgba(0, 0, 0, 0.5),
+    inset 0 2px 5px rgba(255, 255, 255, 0.05),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.4),
+    0 0 0 10px #22252a,
+    0 0 20px rgba(0, 242, 254, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  transition: box-shadow 0.3s ease;
+}
+
+.dialWrapper:active {
+  cursor: grabbing;
+  box-shadow: 
+    0 10px 35px rgba(0, 0, 0, 0.6),
+    inset 0 2px 5px rgba(255, 255, 255, 0.05),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.4),
+    0 0 0 10px #22252a,
+    0 0 30px rgba(0, 242, 254, 0.4);
+}
+
+.indicator {
+  position: absolute;
+  top: -15px;
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 18px solid #00f2fe;
+  filter: drop-shadow(0 0 5px rgba(0, 242, 254, 0.8));
+  z-index: 10;
+}
+
+.svgDial {
+  width: 100%;
+  height: 100%;
+  transform-origin: center;
+}
+
+.dialCenter {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #1a1d20 0%, #0d0e10 100%);
+  border: 4px solid #2d3238;
+  box-shadow: 
+    0 4px 10px rgba(0,0,0,0.5),
+    inset 0 2px 4px rgba(255,255,255,0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.dialValue {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(255,255,255,0.3);
+  font-family: monospace;
+}
+
+.dialDirection {
+  font-size: 0.75rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #00f2fe;
+  text-shadow: 0 0 5px rgba(0, 242, 254, 0.5);
+  margin-top: 4px;
+}
+
+.combinationDisplay {
+  display: flex;
+  gap: 15px;
+  margin: 25px 0 15px 0;
+}
+
+.comboSlot {
+  width: 55px;
+  height: 55px;
+  border-radius: 8px;
+  background: #15181b;
+  border: 2px solid #2d3238;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: #888;
+  transition: all 0.3s ease;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.comboSlotActive {
+  border-color: #00f2fe;
+  color: #00f2fe;
+  box-shadow: 
+    inset 0 2px 4px rgba(0,0,0,0.3),
+    0 0 10px rgba(0, 242, 254, 0.2);
+}
+
+.comboSlotFilled {
+  border-color: #4facfe;
+  color: #fff;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  box-shadow: 
+    0 4px 10px rgba(0,0,0,0.2),
+    0 0 8px rgba(79, 172, 254, 0.3);
+  text-shadow: 0 0 5px rgba(255,255,255,0.5);
+}
+
+.instructionText {
+  font-size: 0.95rem;
+  color: #94a3b8;
+  text-align: center;
+  min-height: 40px;
+  max-width: 280px;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.btnReset {
+  background: transparent;
+  border: 1px solid #334155;
+  color: #94a3b8;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s ease;
+}
+
+.btnReset:hover {
+  background: rgba(255,255,255,0.05);
+  color: #fff;
+  border-color: #64748b;
+}
+
+.dialTicks {
+  stroke: #475569;
+  stroke-width: 1.5;
+}
+
+.dialTicksMajor {
+  stroke: #94a3b8;
+  stroke-width: 2.5;
+}
+
+.dialNumbers {
+  fill: #94a3b8;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: monospace;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
