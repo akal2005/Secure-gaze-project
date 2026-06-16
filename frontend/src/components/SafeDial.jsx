@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styles from './SafeDial.module.css';
 
+const ALPHABET = [
+  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+  'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+  '@', '#', '$', '%', '&', '*', '?', '!', '+', '=', '-', '_', '[', ']'
+]; // 50 characters
+
 export default function SafeDial({ combination, onChange, onComplete }) {
   const [rotation, setRotation] = useState(0);
-  const [currentVal, setCurrentVal] = useState(0);
+  const [currentVal, setCurrentVal] = useState(ALPHABET[0]);
   const [enteredCombo, setEnteredCombo] = useState([null, null, null]);
   const [activeSlot, setActiveSlot] = useState(0);
   const [direction, setDirection] = useState('none');
@@ -15,11 +22,13 @@ export default function SafeDial({ combination, onChange, onComplete }) {
   const startRotation = useRef(0);
   const lastMouseAngle = useRef(0);
   const audioCtxRef = useRef(null);
+  
+  const rotationRef = useRef(0); // Synchronous source of truth for rotation
 
   const lastDirection = useRef('none');
   const movementHistory = useRef([]);
   const peakRotation = useRef(0);
-  const lastLoggedVal = useRef(0);
+  const lastLoggedVal = useRef(ALPHABET[0]);
 
   useEffect(() => {
     updateInstruction(0);
@@ -71,19 +80,20 @@ export default function SafeDial({ combination, onChange, onComplete }) {
 
   const updateInstruction = (slotIndex) => {
     if (slotIndex === 0) {
-      setInstruction('Spin RIGHT (Clockwise) to your 1st digit, then reverse direction to lock it.');
+      setInstruction('Spin RIGHT (Clockwise) to your 1st character, then reverse direction to lock it.');
     } else if (slotIndex === 1) {
-      setInstruction('Spin LEFT (Counter-Clockwise) to your 2nd digit, then reverse direction to lock it.');
+      setInstruction('Spin LEFT (Counter-Clockwise) to your 2nd character, then reverse direction to lock it.');
     } else if (slotIndex === 2) {
-      setInstruction('Spin RIGHT (Clockwise) to your 3rd digit, then reverse direction to lock it.');
+      setInstruction('Spin RIGHT (Clockwise) to your 3rd character, then reverse direction to lock it.');
     } else {
       setInstruction('Combination fully entered! Submit to verify.');
     }
   };
 
   const resetDial = () => {
+    rotationRef.current = 0;
     setRotation(0);
-    setCurrentVal(0);
+    setCurrentVal(ALPHABET[0]);
     setEnteredCombo([null, null, null]);
     setActiveSlot(0);
     setDirection('none');
@@ -109,7 +119,7 @@ export default function SafeDial({ combination, onChange, onComplete }) {
     if (onChange) onChange(newCombo);
     if (nextSlot === 3 && onComplete) onComplete(newCombo);
 
-    peakRotation.current = rotation;
+    peakRotation.current = rotationRef.current;
   };
 
   const handleCenterClick = (e) => {
@@ -134,9 +144,9 @@ export default function SafeDial({ combination, onChange, onComplete }) {
     isDragging.current = true;
     const angle = getMouseAngle(clientX, clientY);
     startAngle.current = angle;
-    startRotation.current = rotation;
+    startRotation.current = rotationRef.current;
     lastMouseAngle.current = angle;
-    peakRotation.current = rotation;
+    peakRotation.current = rotationRef.current;
   };
 
   const handleMove = (clientX, clientY) => {
@@ -148,11 +158,16 @@ export default function SafeDial({ combination, onChange, onComplete }) {
     if (diff > 180) diff -= 360;
     if (diff < -180) diff += 360;
 
-    const newRotation = rotation + diff;
+    const newRotation = rotationRef.current + diff;
+    rotationRef.current = newRotation;
     setRotation(newRotation);
     lastMouseAngle.current = mouseAngle;
 
-    const calculatedVal = Math.round((360 - (newRotation % 360 + 360) % 360) / 3.6) % 100;
+    // 50 characters, so each character takes 7.2 degrees
+    const count = ALPHABET.length;
+    const stepAngle = 360 / count;
+    const index = Math.round((360 - (newRotation % 360 + 360) % 360) / stepAngle) % count;
+    const calculatedVal = ALPHABET[index];
     
     if (calculatedVal !== currentVal) {
       setCurrentVal(calculatedVal);
@@ -178,14 +193,16 @@ export default function SafeDial({ combination, onChange, onComplete }) {
           if (newRotation > peakRotation.current) {
             peakRotation.current = newRotation;
           } else if (peakRotation.current - newRotation > 15) {
-            const peakVal = Math.round((360 - (peakRotation.current % 360 + 360) % 360) / 3.6) % 100;
+            const peakIndex = Math.round((360 - (peakRotation.current % 360 + 360) % 360) / stepAngle) % count;
+            const peakVal = ALPHABET[peakIndex];
             lockNumber(peakVal);
           }
         } else {
           if (newRotation < peakRotation.current) {
             peakRotation.current = newRotation;
           } else if (newRotation - peakRotation.current > 15) {
-            const peakVal = Math.round((360 - (peakRotation.current % 360 + 360) % 360) / 3.6) % 100;
+            const peakIndex = Math.round((360 - (peakRotation.current % 360 + 360) % 360) / stepAngle) % count;
+            const peakVal = ALPHABET[peakIndex];
             lockNumber(peakVal);
           }
         }
@@ -234,14 +251,16 @@ export default function SafeDial({ combination, onChange, onComplete }) {
       window.removeEventListener('touchmove', handleGlobalTouchMove);
       window.removeEventListener('touchend', handleGlobalMouseUp);
     };
-  }, [rotation, activeSlot, currentVal, enteredCombo]);
+  }, [activeSlot, currentVal, enteredCombo]);
 
   const renderTicks = () => {
     const ticks = [];
-    for (let i = 0; i < 100; i++) {
-      const angle = i * 3.6;
+    const count = ALPHABET.length;
+    const stepAngle = 360 / count;
+
+    for (let i = 0; i < count; i++) {
+      const angle = i * stepAngle;
       const isMajor = i % 5 === 0;
-      const isLabeled = i % 10 === 0;
       
       const r1 = 135;
       const r2 = isMajor ? 122 : 128;
@@ -264,21 +283,21 @@ export default function SafeDial({ combination, onChange, onComplete }) {
         />
       );
 
-      if (isLabeled) {
-        const textR = 106;
-        const tx = 150 + textR * Math.cos(angleRad);
-        const ty = 150 + textR * Math.sin(angleRad);
-        ticks.push(
-          <text
-            key={`text-${i}`}
-            x={tx}
-            y={ty}
-            className={styles.dialNumbers}
-          >
-            {i}
-          </text>
-        );
-      }
+      // Label every character on the dial face
+      const textR = 104;
+      const tx = 150 + textR * Math.cos(angleRad);
+      const ty = 150 + textR * Math.sin(angleRad);
+      ticks.push(
+        <text
+          key={`text-${i}`}
+          x={tx}
+          y={ty}
+          className={styles.dialNumbers}
+          style={{ fontSize: '11px', fontWeight: 'bold' }}
+        >
+          {ALPHABET[i]}
+        </text>
+      );
     }
     return ticks;
   };
