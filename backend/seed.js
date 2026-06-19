@@ -85,6 +85,8 @@ async function seed() {
   try {
     // Clean existing database records
     await db.vaultItem.deleteMany({});
+    await db.secureNote.deleteMany({});
+    await db.fileItem.deleteMany({});
     await db.loginAttempt.deleteMany({});
     await db.user.deleteMany({});
 
@@ -144,6 +146,65 @@ async function seed() {
     }
 
     console.log(`[Seed] Stored ${testCredentials.length} encrypted vault secrets.`);
+
+    // Seed secure notes
+    const testNotes = [
+      {
+        title: 'Master Recovery Phrases',
+        content: 'This note stores the cold wallet ledger mnemonic:\n1. abandon 2. ability 3. able 4. about 5. above 6. absent\nKeep offline if possible!'
+      },
+      {
+        title: 'Server SSH Configurations',
+        content: 'Production Server IP: 104.24.12.8\nSSH Port: 2282\nRoot access restricted. Connect via ssh-key only.'
+      }
+    ];
+
+    for (const note of testNotes) {
+      const encryptedTitle = await encryptText(note.title, cryptoKey);
+      const encryptedContent = await encryptText(note.content, cryptoKey);
+      await db.secureNote.create({
+        data: {
+          userId: user.id,
+          title: encryptedTitle,
+          content: encryptedContent
+        }
+      });
+    }
+    console.log(`[Seed] Stored ${testNotes.length} encrypted secure notes.`);
+
+    // Seed mock encrypted file (key_backup.txt)
+    const fileName = 'key_backup.txt';
+    const fileType = 'text/plain';
+    const fileContentStr = 'SECURE GAZE BACKUP FILE\nCreated: 2026\nSystem status: NORMAL\nEncryption key verification successful.';
+    
+    const encoder = new TextEncoder();
+    const fileBytes = encoder.encode(fileContentStr);
+    
+    const fileIv = webcrypto.getRandomValues(new Uint8Array(12));
+    const encryptedFileBuffer = await subtle.encrypt(
+      {
+        name: 'AES-GCM',
+        iv: fileIv
+      },
+      cryptoKey,
+      fileBytes
+    );
+
+    const fileIvHex = bufToHex(fileIv);
+    const ciphertextBase64 = Buffer.from(encryptedFileBuffer).toString('base64');
+    const encryptedFileData = `${fileIvHex}:${ciphertextBase64}`;
+    const encryptedFileName = await encryptText(fileName, cryptoKey);
+
+    await db.fileItem.create({
+      data: {
+        userId: user.id,
+        fileName: encryptedFileName,
+        fileType,
+        fileSize: fileContentStr.length,
+        fileData: encryptedFileData
+      }
+    });
+    console.log(`[Seed] Stored 1 encrypted backup file.`);
 
     // Seed some mock login history
     const loginHistory = [

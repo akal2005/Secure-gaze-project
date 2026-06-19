@@ -291,6 +291,217 @@ app.delete('/api/vault', authenticateToken, async (req, res) => {
 });
 
 // -------------------------------------------------------------
+// Secure Notes CRUD Endpoints
+// -------------------------------------------------------------
+
+// Read all notes
+app.get('/api/notes', authenticateToken, async (req, res) => {
+  try {
+    const notes = await db.secureNote.findMany({
+      where: { userId: req.user.userId },
+      orderBy: { createdAt: 'desc' }
+    });
+    return res.json({ notes });
+  } catch (error) {
+    console.error('Fetch secure notes error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create note
+app.post('/api/notes', authenticateToken, async (req, res) => {
+  try {
+    const { title, content } = req.body;
+
+    if (!title || !content) {
+      return res.status(400).json({ error: 'Encrypted title and content are required' });
+    }
+
+    const note = await db.secureNote.create({
+      data: {
+        userId: req.user.userId,
+        title,
+        content
+      }
+    });
+
+    return res.status(201).json({ message: 'Note saved', note });
+  } catch (error) {
+    console.error('Create secure note error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update note
+app.put('/api/notes', authenticateToken, async (req, res) => {
+  try {
+    const { id, title, content } = req.body;
+
+    if (!id || !title || !content) {
+      return res.status(400).json({ error: 'ID, encrypted title, and encrypted content are required' });
+    }
+
+    const existingNote = await db.secureNote.findUnique({
+      where: { id }
+    });
+
+    if (!existingNote || existingNote.userId !== req.user.userId) {
+      return res.status(404).json({ error: 'Note not found or unauthorized' });
+    }
+
+    const updatedNote = await db.secureNote.update({
+      where: { id },
+      data: {
+        title,
+        content
+      }
+    });
+
+    return res.json({ message: 'Note updated', note: updatedNote });
+  } catch (error) {
+    console.error('Update secure note error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete note
+app.delete('/api/notes', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.query;
+
+    if (!id) {
+      return res.status(400).json({ error: 'ID parameter is required' });
+    }
+
+    const existingNote = await db.secureNote.findUnique({
+      where: { id }
+    });
+
+    if (!existingNote || existingNote.userId !== req.user.userId) {
+      return res.status(404).json({ error: 'Note not found or unauthorized' });
+    }
+
+    await db.secureNote.delete({
+      where: { id }
+    });
+
+    return res.json({ message: 'Note deleted' });
+  } catch (error) {
+    console.error('Delete secure note error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// -------------------------------------------------------------
+// Encrypted File Safe Endpoints
+// -------------------------------------------------------------
+
+// Fetch file metadata list
+app.get('/api/files', authenticateToken, async (req, res) => {
+  try {
+    const files = await db.fileItem.findMany({
+      where: { userId: req.user.userId },
+      select: {
+        id: true,
+        userId: true,
+        fileName: true, // encrypted
+        fileType: true, // plaintext
+        fileSize: true, // plaintext
+        createdAt: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    return res.json({ files });
+  } catch (error) {
+    console.error('Fetch files error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Fetch full single file (including data)
+app.get('/api/files/download', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.query;
+    if (!id) {
+      return res.status(400).json({ error: 'ID parameter is required' });
+    }
+
+    const file = await db.fileItem.findUnique({
+      where: { id }
+    });
+
+    if (!file || file.userId !== req.user.userId) {
+      return res.status(404).json({ error: 'File not found or unauthorized' });
+    }
+
+    return res.json({ file });
+  } catch (error) {
+    console.error('Download file error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Upload encrypted file
+app.post('/api/files', authenticateToken, async (req, res) => {
+  try {
+    const { fileName, fileType, fileSize, fileData } = req.body;
+
+    if (!fileName || !fileType || !fileSize || !fileData) {
+      return res.status(400).json({ error: 'fileName, fileType, fileSize, and encrypted fileData are required' });
+    }
+
+    // Limit file size to 10MB to avoid database bloat and memory issues in sqlite
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (fileSize > MAX_SIZE) {
+      return res.status(400).json({ error: 'File size exceeds 10MB limit' });
+    }
+
+    const file = await db.fileItem.create({
+      data: {
+        userId: req.user.userId,
+        fileName,
+        fileType,
+        fileSize,
+        fileData
+      }
+    });
+
+    return res.status(201).json({ message: 'File encrypted and stored', fileId: file.id });
+  } catch (error) {
+    console.error('Upload file error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete encrypted file
+app.delete('/api/files', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.query;
+
+    if (!id) {
+      return res.status(400).json({ error: 'ID parameter is required' });
+    }
+
+    const file = await db.fileItem.findUnique({
+      where: { id }
+    });
+
+    if (!file || file.userId !== req.user.userId) {
+      return res.status(404).json({ error: 'File not found or unauthorized' });
+    }
+
+    await db.fileItem.delete({
+      where: { id }
+    });
+
+    return res.json({ message: 'File deleted from safe' });
+  } catch (error) {
+    console.error('Delete file error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// -------------------------------------------------------------
 // Logging Endpoints
 // -------------------------------------------------------------
 app.get('/api/logs', authenticateToken, async (req, res) => {

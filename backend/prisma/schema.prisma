@@ -14,6 +14,8 @@ model User {
   salt          String         // Salt for client-side encryption key derivation
   createdAt     DateTime       @default(now())
   vaultItems    VaultItem[]
+  secureNotes   SecureNote[]
+  fileItems     FileItem[]
   loginAttempts LoginAttempt[]
 }
 
@@ -38,4 +40,25 @@ model LoginAttempt {
   details     String?
   userId      String?
   user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SecureNote {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String   // encrypted title
+  content   String   // encrypted content
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FileItem {
+  id        String   @id @default(uuid())
+  userId    String
+  fileName  String   // encrypted file name
+  fileType  String   // plaintext file type (e.g. image/png)
+  fileSize  Int      // plaintext file size in bytes
+  fileData  String   // encrypted base64 file data
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
